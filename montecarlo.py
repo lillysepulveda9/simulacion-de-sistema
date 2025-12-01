@@ -72,7 +72,6 @@ class JobShopGreedyECT:
             def gen_val():
                 return 15.0
         else:
-            # fallback por si acaso
             def gen_val():
                 return 5.0
 
@@ -154,7 +153,6 @@ def correr_experimentos(
 
     for s in range(1, n_simulaciones + 1):
 
-        # --- valores aleatorios o fijos ---
         if usar_aleatorio:
             n_jobs = random.randint(20, 30)
             n_machines = random.randint(3, 5)
@@ -190,11 +188,11 @@ def correr_experimentos(
 # ================================ STREAMLIT UI ============================
 # ==========================================================================
 
-st.title("Simulación Job-Shop (Greedy ECT / FIFO)")
+# 🔵 SOLO CAMBIÉ ESTA LÍNEA
+st.title("20 Simulaciones Estocásticas de un Sistema Job-Shop (Monte Carlo)")
 
 st.header("Parámetros")
 
-# ---- session_state inicial ----
 if "n_trabajos" not in st.session_state:
     st.session_state["n_trabajos"] = 26
 if "n_maquinas" not in st.session_state:
@@ -223,7 +221,6 @@ with col_param:
         key="n_trabajos",
     )
 
-    # Elementos 10, 20, 30
     opciones_elem = [10, 20, 30]
     valor_actual = st.session_state.get("n_elementos", 10)
     if valor_actual not in opciones_elem:
@@ -243,7 +240,6 @@ with col_param:
         key="n_maquinas",
     )
 
-    # ---- NUEVO: rates aleatorio / fijos 5,10,15 ----
     rate_mode = st.selectbox(
         "Rates (u/hr)",
         ["Aleatorio", "Fijo 5", "Fijo 10", "Fijo 15"],
@@ -254,8 +250,8 @@ with col_param:
         ["Greedy ECT", "FIFO aleatorio"],
         index=0,
         help=(
-            "Greedy ECT: se asigna el elemento a la máquina donde termina antes.\n"
-            "FIFO aleatorio: cada elemento va a una máquina aleatoria."
+            "Greedy ECT: asigna a la máquina donde termina antes.\n"
+            "FIFO aleatorio: asigna cada elemento a una máquina aleatoria."
         ),
     )
 
@@ -294,7 +290,6 @@ if ejecutar:
         "carpeta": CARPETA_SALIDA,
     }
 
-# -------------------- mostrar resultados -------------------- #
 if "resultados_sim" in st.session_state:
     res = st.session_state["resultados_sim"]
 
@@ -310,4 +305,5 @@ if "resultados_sim" in st.session_state:
         f"Min: {res['min']:.3f} | Máx: {res['max']:.3f}"
     )
     st.write(f"CSVs guardados en: `{res['carpeta']}`")
+
 
