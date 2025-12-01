@@ -125,9 +125,9 @@ class MonteCarloIntegral:
 st.title("Estimación de Integrales por el Método de Montecarlo")
 
 # === DESCRIPCIÓN CON TEXTO + LATEX CORRECTO === #
-st.markdown("Este programa estima la integral:")
+st.markdown("Este programa estima la siguiente integral:")
 
-st.latex(r"\int_a^b \frac{2}{\pi} f(x)\,dx")
+st.latex(r"\int_{-6}^{6} \frac{2}{\pi} f(x)\,dx")
 
 st.markdown("donde puedes elegir entre las siguientes funciones del examen:")
 
@@ -149,24 +149,19 @@ with col_izq:
         index=0,
     )
 
-    a = st.number_input(
-        "Límite inferior (a)",
-        value=-6.0,
-        help="Ejemplo típico del examen: a = -6",
-    )
-
-    b = st.number_input(
-        "Límite superior (b)",
-        value=6.0,
-        help="Ejemplo típico: b = 6",
-    )
+    # Intervalo fijo [-6, 6], sin opción de cambiarlo
+    a = -6.0
+    b = 6.0
+    st.markdown("**Intervalo de integración fijo:**")
+    st.latex(r"[a,b] = [-6,6]")
 
     n = st.number_input(
-        "Tamaño de la muestra (n)",
+        "Tamaño de la muestra (n réplicas)",
         min_value=1,
         max_value=500000,
-        value=1000,
-        step=100,
+        value=10,        # ya no 1000 "hardcodeado"
+        step=1,
+        help="Número de réplicas n para x_i ~ U(-6,6).",
     )
 
     col_b1, col_b2 = st.columns(2)
@@ -236,9 +231,9 @@ if "mc_resultados" in st.session_state:
         if estim_final is not None:
             st.markdown("**Estimación de la integral:**")
             st.latex(
-    r"\hat{I} = \frac{2}{\pi}\cdot\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
-    + f"{estim_final:.6f}"
-)
+                r"\hat{I} = \frac{2}{\pi}\cdot\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
+                + f"{estim_final:.6f}"
+            )
 
     st.markdown("---")
     st.subheader("Muestras, alturas y áreas")
