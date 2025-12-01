@@ -25,8 +25,16 @@ h1, h2, h3, h4 {
 class JobShopGreedyECT:
     """
     Simula un sistema Job-Shop donde cada trabajo consta de 'elementos_por_trabajo'
-    elementos. Cada elemento se asigna, uno por uno, a la máquina donde TERMINA antes,
-    considerando el tiempo ya comprometido (heurística Greedy ECT).
+    elementos.
+
+    MODO "Greedy ECT":
+        Cada elemento se asigna a la máquina donde TERMINA antes,
+        considerando el tiempo ya comprometido (heurística Greedy ECT).
+
+    MODO "FIFO aleatorio":
+        Se recorre el mismo orden de trabajos/elementos, pero cada elemento
+        se asigna a una máquina elegida aleatoriamente. Dentro de cada máquina,
+        se respeta el orden de llegada (FIFO).
 
     - num_jobs: número de trabajos J
     - num_machines: número de máquinas M
@@ -34,6 +42,7 @@ class JobShopGreedyECT:
     - rate_mode: 'Aleatorio', 'Manual' o 'Mixto'
     - rate_min, rate_max: límites de muestreo para rates aleatorios (u/hr)
     - rate_df: matriz de rates (Trabajo x Máquina) definida por usuario (pandas.DataFrame)
+    - sequencing_mode: 'Greedy ECT' o 'FIFO aleatorio'
     """
 
     def __init__(
@@ -45,6 +54,7 @@ class JobShopGreedyECT:
         rate_min: float = 1.0,
         rate_max: float = 5.0,
         rate_df: pd.DataFrame | None = None,
+        sequencing_mode: str = "Greedy ECT",
     ):
         self.num_jobs = num_jobs
         self.num_machines = num_machines
@@ -53,6 +63,7 @@ class JobShopGreedyECT:
         self.rate_min = rate_min
         self.rate_max = rate_max
         self.rate_df = rate_df
+        self.sequencing_mode = sequencing_mode  # <<---- nuevo parámetro
 
         # Estos se llenan en run()
         self.rates = None
@@ -95,10 +106,10 @@ class JobShopGreedyECT:
             idx = [f"J{j+1}" for j in range(self.num_jobs)]
             return pd.DataFrame(data, index=idx, columns=cols)
 
-    # ---------------------- simulación greedy ECT -------------------- #
+    # ---------------------- simulación job-shop ---------------------- #
     def run(self):
         """
-        Ejecuta la secuenciación Greedy ECT y devuelve:
+        Ejecuta la secuenciación y devuelve:
         - makespan (float, en horas)
         - df_traza (DataFrame con la traza completa)
         - rates (DataFrame con la matriz de rates usada)
@@ -114,24 +125,33 @@ class JobShopGreedyECT:
         # Recorremos trabajos y elementos
         for j in range(self.num_jobs):
             for e in range(self.elementos_por_trabajo):
-                tiempos_fin = []
 
+                # Tiempo de proceso del elemento j,e en cada máquina
+                tiempos_fin = []
+                tiempos_proc = []
                 for m in range(self.num_machines):
-                    # Tiempo de proceso de un solo elemento:
                     rate_ij = rates.iat[j, m]  # u/hr
                     if rate_ij <= 0:
                         proc_time = float("inf")
                     else:
                         proc_time = 1.0 / rate_ij  # horas por elemento
-
+                    tiempos_proc.append(proc_time)
                     fin_m = carga_maquinas[m] + proc_time
                     tiempos_fin.append(fin_m)
 
-                # Elegimos la máquina con menor tiempo de terminación
-                mejor_maquina = min(range(self.num_machines), key=lambda mm: tiempos_fin[mm])
+                # ------------- REGLA DE SECUENCIACIÓN ---------------- #
+                if self.sequencing_mode == "Greedy ECT":
+                    # Elegimos la máquina con menor tiempo de terminación
+                    mejor_maquina = min(
+                        range(self.num_machines), key=lambda mm: tiempos_fin[mm]
+                    )
+                else:  # FIFO aleatorio
+                    # Se elige una máquina al azar (todas con la misma probabilidad)
+                    mejor_maquina = random.randint(0, self.num_machines - 1)
 
+                proc_time = tiempos_proc[mejor_maquina]
                 inicio = carga_maquinas[mejor_maquina]
-                fin = tiempos_fin[mejor_maquina]
+                fin = inicio + proc_time
                 carga_maquinas[mejor_maquina] = fin
 
                 registros.append(
@@ -169,6 +189,7 @@ def correr_experimentos(
     rate_mode: str,
     rate_df: pd.DataFrame,
     carpeta_salida: str,
+    sequencing_mode: str,
 ):
     """
     Corre S simulaciones independientes y devuelve:
@@ -199,6 +220,7 @@ def correr_experimentos(
             rate_min=1.0,
             rate_max=5.0,
             rate_df=rate_df,
+            sequencing_mode=sequencing_mode,
         )
 
         mk, df_traza, rates = simulador.run()
@@ -219,7 +241,8 @@ def correr_experimentos(
 
         descripciones.append(
             f"Sim {s:02d} | Trabajos={n_jobs}, Máquinas={n_machines}, "
-            f"Elem={elementos_por_trabajo}, {desc_mode} → Makespan={mk:.3f} h"
+            f"Elem={elementos_por_trabajo}, {desc_mode}, Regla={sequencing_mode} "
+            f"→ Makespan={mk:.3f} h"
         )
 
     return makespans, descripciones
@@ -292,17 +315,22 @@ with col_param:
         ["Aleatorio", "Manual", "Mixto (manual + aleatorio)"],
     )
 
-    _modo_seq = st.selectbox(
+    # >>> Aquí ya está habilitado el combo con las dos reglas <<<
+    modo_seq = st.selectbox(
         "Modo de secuenciación",
-        ["Greedy ECT"],
+        ["Greedy ECT", "FIFO aleatorio"],
         index=0,
-        disabled=True,
-        help="Se utiliza la heurística Greedy ECT (Earliest Completion Time).",
+        help=(
+            "Greedy ECT: asigna el elemento a la máquina donde termina antes.\n"
+            "FIFO aleatorio: cada elemento se manda a una máquina aleatoria; "
+            "dentro de cada máquina se respeta el orden de llegada."
+        ),
     )
 
     st.markdown(
         "*En modo manual se usan los valores de la tabla de rates "
-        "(el combo de modo de secuenciación no aplica).*"
+        "(el combo de modo de secuenciación no aplica para la matriz, "
+        "solo para la regla con que se asignan los elementos a las máquinas).*"
     )
 
     col_b1, col_b2 = st.columns(2)
@@ -337,6 +365,7 @@ if ejecutar:
         rate_mode=rate_mode,
         rate_df=st.session_state["rate_df"],
         carpeta_salida=CARPETA_SALIDA,
+        sequencing_mode=modo_seq,
     )
 
     if makespans:
@@ -355,6 +384,7 @@ if ejecutar:
         "carpeta": CARPETA_SALIDA,
         "usar_aleatorio": usar_aleatorio,
         "rate_mode": rate_mode,
+        "modo_seq": modo_seq,
     }
 
 # -------------------------- MOSTRAR RESULTADOS --------------------------- #
@@ -379,9 +409,9 @@ if "resultados_sim" in st.session_state:
 
     st.markdown(
         """
-✅ **Simulación terminada.** Revisa los CSVs por simulación.  
-🟦 Aleatorio → Trabajos y máquinas se sortearon en los rangos indicados.  
-🟧 Modo manual → edita la matriz de rates (M1..M5).  
+**Simulación terminada.** Revisa los CSVs por simulación.  
+Aleatorio → Trabajos y máquinas se sortearon en los rangos indicados.  
+Modo manual → edita la matriz de rates (M1..M5).  
+Regla de secuenciación seleccionada en el combo (Greedy ECT o FIFO aleatorio).  
 """
     )
-
