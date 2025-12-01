@@ -22,9 +22,12 @@ h1, h2, h3, h4 {
 
 class MonteCarloIntegral:
     """
-    Implementa el algoritmo de Montecarlo para estimar una integral:
+    Implementa el algoritmo de Montecarlo para estimar la integral:
 
-        Integral_a^b f(x) dx
+        Integral_a^b (2/pi) * f(x) dx
+
+    Es decir:
+        I = ∫_a^b (2/π) f(x) dx
 
     Funciones del examen:
         a) f(x) = 1 / (e^x + e^{-x})
@@ -59,7 +62,8 @@ class MonteCarloIntegral:
         """
         1) x_i ~ U(a,b)
         2) f_i = f(x_i)
-        3) Área_i = (factor * fxi) * (2/math.pi)
+        3) Área_i = factor * fxi * (2 / math.pi)
+
 
         4) Integral ≈ suma de áreas
         """
@@ -109,7 +113,7 @@ st.title("Estimación de Integrales por el Método de Montecarlo")
 # === DESCRIPCIÓN CON TEXTO + LATEX CORRECTO === #
 st.markdown("Este programa estima la integral:")
 
-st.latex(r"\int_a^b f(x)\,dx")
+st.latex(r"\int_a^b \frac{2}{\pi} f(x)\,dx")
 
 st.markdown("donde puedes elegir entre las siguientes funciones del examen:")
 
