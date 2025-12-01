@@ -26,11 +26,6 @@ class MonteCarloIntegral:
 
         Integral_a^b f(x) dx
 
-    con:
-        1) x_i ~ U(a, b)
-        2) f_i = f(x_i)
-        3) Integral ≈ (b - a)/n * sum_{i=1}^n f_i
-
     Funciones del examen:
         a) f(x) = 1 / (e^x + e^{-x})
         b) f(x) = 2 / (e^x + e^{-x})
@@ -49,35 +44,29 @@ class MonteCarloIntegral:
 
     # ---------------------- definición de f(x) ---------------------- #
     def _f(self, x: float) -> float:
-        """
-        Devuelve f(x) según la opción elegida:
-            a) f(x) = 1 / (e^x + e^{-x})
-            b) f(x) = 2 / (e^x + e^{-x})
-        """
+        """ Devuelve f(x) según la opción elegida. """
         den = math.exp(x) + math.exp(-x)
         if den == 0:
             return 0.0
 
         if self.opcion_funcion == "a":
             return 1.0 / den
-        else:  # "b"
+        else:
             return 2.0 / den
 
     # ---------------------- algoritmo de Montecarlo ---------------------- #
     def run(self):
         """
-        Ejecuta el algoritmo de Montecarlo:
-
-        1) Genera n valores x_i ~ U(a,b)
-        2) Calcula f(x_i) para cada muestra
-        3) Calcula áreas individuales: ((b-a)/n) * f(x_i)
-        4) Estimación de la integral: suma de las áreas
+        1) x_i ~ U(a,b)
+        2) f_i = f(x_i)
+        3) Área_i = ((b-a)/n) * f(x_i)
+        4) Integral ≈ suma de áreas
         """
 
         if self.n <= 0:
-            raise ValueError("El tamaño de la muestra n debe ser mayor que 0.")
+            raise ValueError("El tamaño de muestra n debe ser mayor que 0.")
         if self.a >= self.b:
-            raise ValueError("Se requiere que a < b para el intervalo de integración.")
+            raise ValueError("Debe cumplirse a < b.")
 
         xs = []
         fs = []
@@ -86,9 +75,9 @@ class MonteCarloIntegral:
         factor = (self.b - self.a) / float(self.n)
 
         for _ in range(self.n):
-            xi = random.uniform(self.a, self.b)  # x_i ~ U(a,b)
-            fxi = self._f(xi)                    # altura f(x_i)
-            area_i = factor * fxi                # área de cada rectángulo
+            xi = random.uniform(self.a, self.b)
+            fxi = self._f(xi)
+            area_i = factor * fxi
 
             xs.append(xi)
             fs.append(fxi)
@@ -99,17 +88,16 @@ class MonteCarloIntegral:
         self.areas = areas
         self.estimacion = sum(areas)
 
-        # Construir DataFrame con parámetros de salida:
-        # valores aleatorios generados, alturas y áreas
         df_resultados = pd.DataFrame(
             {
-                "x_i (muestra U(a,b))": xs,
-                "f(x_i) (altura)": fs,
-                "Área_i = (b-a)/n * f(x_i)": areas,
+                "x_i": xs,
+                "f(x_i)": fs,
+                "Área_i": areas,
             }
         )
 
         return self.estimacion, df_resultados
+
 
 # ==========================================================================
 # ================================ STREAMLIT UI ============================
@@ -117,20 +105,18 @@ class MonteCarloIntegral:
 
 st.title("Estimación de Integrales por el Método de Montecarlo")
 
-st.markdown(
-    """
-Este programa implementa el algoritmo de Montecarlo para aproximar la integral:
+# === DESCRIPCIÓN CON TEXTO + LATEX CORRECTO === #
+st.markdown("Este programa estima la integral:")
 
-\\[
-\\int_a^b f(x)\\,dx
-\\]
+st.latex(r"\int_a^b f(x)\,dx")
 
-donde puedes elegir entre las funciones del examen:
+st.markdown("donde puedes elegir entre las siguientes funciones del examen:")
 
-- **Opción (a):** \\( f(x) = \\frac{1}{e^x + e^{-x}} \\)
-- **Opción (b):** \\( f(x) = \\frac{2}{e^x + e^{-x}} \\)
-"""
-)
+st.markdown("- **Opción (a):**")
+st.latex(r"f(x) = \frac{1}{e^x + e^{-x}}")
+
+st.markdown("- **Opción (b):**")
+st.latex(r"f(x) = \frac{2}{e^x + e^{-x}}")
 
 st.header("Parámetros de entrada")
 
@@ -142,31 +128,26 @@ with col_izq:
         "Selecciona la función f(x):",
         options=["a", "b"],
         index=0,
-        help=(
-            "a) f(x) = 1 / (e^x + e^{-x})\n"
-            "b) f(x) = 2 / (e^x + e^{-x})"
-        ),
     )
 
     a = st.number_input(
         "Límite inferior (a)",
         value=-6.0,
-        help="Ejemplo típico del examen: a = -6. Recuerda que debe cumplirse a < b.",
+        help="Ejemplo típico del examen: a = -6",
     )
 
     b = st.number_input(
         "Límite superior (b)",
         value=6.0,
-        help="Ejemplo típico del examen: b = 6. Recuerda que debe cumplirse a < b.",
+        help="Ejemplo típico: b = 6",
     )
 
     n = st.number_input(
-        "Tamaño de la muestra (n réplicas)",
+        "Tamaño de la muestra (n)",
         min_value=1,
-        max_value=1000000,
+        max_value=500000,
         value=1000,
         step=100,
-        help="Número de puntos aleatorios generados x_i ~ U(a,b).",
     )
 
     col_b1, col_b2 = st.columns(2)
@@ -177,7 +158,8 @@ if limpiar:
     if "mc_resultados" in st.session_state:
         del st.session_state["mc_resultados"]
 
-# ----------------------- EJECUCIÓN DEL MODELO ---------------------------- #
+
+# ----------------------- EJECUCIÓN ---------------------------- #
 
 if ejecutar:
     try:
@@ -194,52 +176,45 @@ if ejecutar:
         }
 
     except Exception as e:
-        st.error(f"Error en la simulación: {e}")
+        st.error(f"⚠ Error en la simulación: {e}")
 
-# ----------------------- DESPLIEGUE DE RESULTADOS ------------------------ #
+
+# ----------------------- RESULTADOS --------------------------- #
 
 if "mc_resultados" in st.session_state:
     res = st.session_state["mc_resultados"]
 
     with col_der:
-        st.subheader("Parámetros de salida")
+        st.subheader("Resultados")
 
-        texto_funcion = (
-            "f(x) = 1 / (e^x + e^{-x})" if res["opcion_funcion"] == "a"
-            else "f(x) = 2 / (e^x + e^{-x})"
+        funcion_texto = (
+            r"f(x)=\frac{1}{e^x + e^{-x}}" if res["opcion_funcion"] == "a"
+            else r"f(x)=\frac{2}{e^x + e^{-x}}"
         )
+
+        st.markdown("**Función usada:**")
+        st.latex(funcion_texto)
 
         st.markdown(
             f"""
-**Función elegida:** {texto_funcion}  
-**Intervalo:** [a, b] = [{res['a']}, {res['b']}]  
-**Tamaño de muestra:** n = {res['n']}  
-
-**Estimación de la integral (Montecarlo):**  
-\\[
-\\hat{{I}} \\approx {res["estimacion"]:.6f}
-\\]
+**Intervalo:** [{res['a']}, {res['b']}]  
+**Tamaño de muestra:** n = {res['n']}
 """
         )
 
+        st.markdown("**Estimación de la integral:**")
+        st.latex(r"\hat{I} \approx " + f"{res['estimacion']:.6f}")
+
     st.markdown("---")
-    st.subheader("Valores aleatorios, alturas y áreas individuales")
+    st.subheader("Muestras, alturas y áreas")
 
-    st.caption(
-        "La tabla contiene los valores aleatorios generados x_i, las alturas f(x_i) y "
-        "las áreas individuales Área_i = (b-a)/n * f(x_i), cuyo sumatorio es la estimación de la integral."
-    )
+    st.dataframe(res["df"], use_container_width=True)
 
-    st.dataframe(
-        res["df"],
-        use_container_width=True,
-    )
-
-    # Opcional: descarga de resultados a CSV
+    # Botón de descarga
     csv = res["df"].to_csv(index=False).encode("utf-8")
     st.download_button(
-        label="⬇ Descargar resultados en CSV",
+        label="⬇ Descargar CSV",
         data=csv,
-        file_name="MonteCarlo_Integral_Resultados.csv",
+        file_name="MonteCarlo_Resultados.csv",
         mime="text/csv",
     )
