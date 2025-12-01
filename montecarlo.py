@@ -264,25 +264,33 @@ with col_param:
 # === MATRIZ DE RATES REFERENCIAL (COMO AL INICIO, SOLO VISUAL) ====
 # ==================================================================
 
-# Matriz 30 trabajos × 5 máquinas, editable (no afecta la lógica actual)
+# ==================================================================
+# === MATRIZ DE RATES (IGUAL QUE AL INICIO, EDITABLE) ==============
+# ==================================================================
+
 MAX_TRABAJOS = 30
 MAX_MAQUINAS = 5
+
 if "rate_df" not in st.session_state:
     columnas = [f"M{k+1}" for k in range(MAX_MAQUINAS)]
     index = [f"J{j+1}" for j in range(MAX_TRABAJOS)]
-    # Valor referencial 5 u/hr
-    st.session_state["rate_df"] = pd.DataFrame(5.0, index=index, columns=columnas)
+
+    #MATRIZ INICIAL REALISTA: valores 5, 10 o 15 aleatorios
+    data = [
+        [random.choice([5, 10, 15]) for _ in range(MAX_MAQUINAS)]
+        for _ in range(MAX_TRABAJOS)
+    ]
+
+    st.session_state["rate_df"] = pd.DataFrame(data, index=index, columns=columnas)
 
 st.subheader("Matriz de rates (Trabajo × Máquina)")
-st.caption(
-    "Matriz referencial de rates. La simulación usa los valores definidos en el "
-    "combo 'Rates (u/hr)'; esta tabla es solo ilustrativa/para edición manual."
-)
+st.caption("Edita M1..M5; el simulador usa solo las primeras N máquinas.")
 st.data_editor(
     st.session_state["rate_df"],
     key="editor_rates",
     use_container_width=True,
 )
+
 
 CARPETA_SALIDA = os.path.join(os.getcwd(), "ExamenSims")
 
