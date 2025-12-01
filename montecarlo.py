@@ -114,6 +114,7 @@ class MonteCarloIntegral:
             }
         )
 
+        # devuelve ambas estimaciones
         return self.estimacion, self.estimacion_base, df_resultados
 
 
@@ -221,19 +222,23 @@ if "mc_resultados" in st.session_state:
 """
         )
 
-        # Paso 3: (b-a)/n * sum f(x_i)
-        st.markdown("**Cálculo intermedio:**")
-        st.latex(
-            r"\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
-            + f"{res['estimacion_base']:.6f}"
-        )
+        # Accesos seguros con .get() para evitar KeyError si hay estado viejo
+        estim_base = res.get("estimacion_base", None)
+        estim_final = res.get("estimacion", None)
 
-        # Paso 4: Integral con factor 2/pi
-        st.markdown("**Estimación de la integral:**")
-        st.latex(
-            r"\hat{I} = \frac{2}{\pi}\cdot\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
-            + f"{res['estimacion']:.6f}"
-        )
+        if estim_base is not None:
+            st.markdown("**Cálculo intermedio:**")
+            st.latex(
+                r"\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
+                + f"{estim_base:.6f}"
+            )
+
+        if estim_final is not None:
+            st.markdown("**Estimación de la integral:**")
+            st.latex(
+                r"\hat{I} = \frac{2}{\pi}\cdot\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
+                + f"{estim_final:.6f}"
+            )
 
     st.markdown("---")
     st.subheader("Muestras, alturas y áreas")
