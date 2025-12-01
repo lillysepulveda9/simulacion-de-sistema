@@ -3,192 +3,385 @@ import streamlit as st
 import pandas as pd
 import random
 import math
+import os
 
 # ====== ESTILOS GLOBALES ======
-st.markdown("""
+st.markdown(
+    """
 <style>
 h1, h2, h3, h4 {
     color: #0066FF !important;
 }
 </style>
-""", unsafe_allow_html=True)
-# ===================================================================
-
-
-# ===================== CLASE MONTECARLO ============================
-class Montecarlo:
-    def __init__(self, num_variables=5, n_experimentos=6, criterio_sorteo=4, 
-                 limite_inferior=1000, limite_superior=5000, tecnica_reduccion="ninguna"):
-
-        self.num_variables = num_variables
-        self.n_experimentos = n_experimentos
-        self.criterio_sorteo = criterio_sorteo
-        self.limite_inferior = limite_inferior
-        self.limite_superior = limite_superior
-        self.tecnica_reduccion = tecnica_reduccion.lower()
-
-        self.crear_experimentos()
-        self.sortear()
-        self.metricas()
-
-    def crear_experimentos(self):
-        self.experimentos = []
-
-        # VARIABLES ANTITÉTICAS
-        if self.tecnica_reduccion == "variables antitéticas":
-            n_pares = self.n_experimentos // 2
-            for i in range(n_pares):
-                us = [random.random() for _ in range(self.num_variables)]
-                exp1 = [self.limite_inferior + (self.limite_superior - self.limite_inferior) * u for u in us]
-                exp2 = [self.limite_inferior + (self.limite_superior - self.limite_inferior) * (1 - u) for u in us]
-                self.experimentos.append(exp1)
-                self.experimentos.append(exp2)
-            if self.n_experimentos % 2 == 1:
-                extra = [random.uniform(self.limite_inferior, self.limite_superior) for _ in range(self.num_variables)]
-                self.experimentos.append(extra)
-
-        # MUESTREO ESTRATIFICADO (LHS)
-        elif self.tecnica_reduccion == "muestreo estratificado (lhs)":
-            n = self.n_experimentos
-            d = self.num_variables
-            lower_limits = [[float(k) / n for k in range(n)] for _ in range(d)]
-            for j in range(d):
-                random.shuffle(lower_limits[j])
-            points = []
-            for i in range(n):
-                point = [lower_limits[j][i] + random.random() / n for j in range(d)]
-                points.append(point)
-            for row in points:
-                exp = [self.limite_inferior + (self.limite_superior - self.limite_inferior) * p for p in row]
-                self.experimentos.append(exp)
-
-        # SIN REDUCCIÓN DE VARIANZA
-        else:
-            for i in range(self.n_experimentos):
-                exp = [random.randint(self.limite_inferior, self.limite_superior) for _ in range(self.num_variables)]
-                self.experimentos.append(exp)
-
-    def sortear(self):
-        satelite = []
-
-        if self.tecnica_reduccion == "variables antitéticas":
-            step = 2
-            num_pares = self.n_experimentos // 2
-            for i in range(0, 2 * num_pares, step):
-                exp1 = sorted(self.experimentos[i])
-                exp2 = sorted(self.experimentos[i + 1])
-                x1 = exp1[self.criterio_sorteo - 1]
-                x2 = exp2[self.criterio_sorteo - 1]
-                satelite.append((x1 + x2) / 2)
-            if self.n_experimentos % 2 == 1:
-                exp_extra = sorted(self.experimentos[-1])
-                satelite.append(exp_extra[self.criterio_sorteo - 1])
-
-        else:
-            for experimento in self.experimentos:
-                exp_sorted = sorted(experimento)
-                satelite.append(exp_sorted[self.criterio_sorteo - 1])
-
-        self.satelite = satelite
-
-    def metricas(self):
-        if len(self.satelite) == 0:
-            self.promedio_falla = 0
-            self.desviacion_estandar_muestral = 0
-            self.standard_error = 0
-            return
-
-        self.promedio_falla = sum(self.satelite) / len(self.satelite)
-
-        if len(self.satelite) > 1:
-            self.desviacion_estandar_muestral = math.sqrt(
-                sum((x - self.promedio_falla)**2 for x in self.satelite) / (len(self.satelite) - 1)
-            )
-        else:
-            self.desviacion_estandar_muestral = 0
-
-        self.standard_error = (
-            self.desviacion_estandar_muestral / math.sqrt(len(self.satelite))
-            if len(self.satelite) > 0 else 0
-        )
-
-    def retornar_resultados(self):
-        lista = [
-            self.satelite,
-            round(self.promedio_falla, 2),
-            round(self.desviacion_estandar_muestral, 2),
-            round(self.standard_error, 2)
-        ]
-        return self.experimentos, lista, self.satelite
-# ===================================================================
-
-
-
-# ===================== STREAMLIT UI ================================
-st.title("Simulación Montecarlo")
-
-st.header("Problema:")
-st.write("""
-Supongamos que tenemos un satélite que depende de 5 paneles solares.  
-Queremos estimar el tiempo hasta que falla el sistema (MTTF),  
-simulando la vida útil de los paneles (uniforme entre 1000 y 5000 hs).
-""")
-
-st.subheader("Parámetros de la simulación:")
-
-# Inputs
-n = st.number_input("Número de simulaciones (n):", min_value=1, value=6, step=1)
-paneles = st.number_input("Número de paneles:", min_value=1, value=5)
-panel_para_fallar = st.number_input("Número de paneles necesarios para que deje de funcionar el satélite:", min_value=1, value=4)
-
-st.write("Cada panel tiene vida útil uniforme en el rango [1000, 5000]. Puedes modificar los límites:")
-
-col1, col2 = st.columns(2)
-with col1:
-    limite_inferior = st.number_input("Límite inferior (hs):", min_value=0, value=1000, step=100)
-with col2:
-    limite_superior = st.number_input("Límite superior (hs):", min_value=limite_inferior + 1, value=5000, step=100)
-
-tecnica_reduccion = st.selectbox(
-    "Técnica de reducción de varianza:",
-    ["Ninguna", "Variables Antitéticas", "Muestreo Estratificado (LHS)"]
+""",
+    unsafe_allow_html=True,
 )
 
+# ==========================================================================
+# ===================== CLASE JOB SHOP / GREEDY ECT ========================
+# ==========================================================================
 
-# ===== BOTÓN =====
-if st.button("Ejecutar Simulación"):
 
-    st.subheader("Resultados de la Simulación:")
+class JobShopGreedyECT:
+    """
+    Simula un sistema Job-Shop donde cada trabajo consta de 'elementos_por_trabajo'
+    elementos. Cada elemento se asigna, uno por uno, a la máquina donde TERMINA antes,
+    considerando el tiempo ya comprometido (heurística Greedy ECT).
 
-    simulacion = Montecarlo(
-        num_variables=paneles,
-        n_experimentos=n,
-        criterio_sorteo=panel_para_fallar,
-        limite_inferior=limite_inferior,
-        limite_superior=limite_superior,
-        tecnica_reduccion=tecnica_reduccion
-    )
+    - num_jobs: número de trabajos J
+    - num_machines: número de máquinas M
+    - elementos_por_trabajo: elementos u operaciones por trabajo
+    - rate_mode: 'Aleatorio', 'Manual' o 'Mixto'
+    - rate_min, rate_max: límites de muestreo para rates aleatorios (u/hr)
+    - rate_df: matriz de rates (Trabajo x Máquina) definida por usuario (pandas.DataFrame)
+    """
 
-    experimentos, resultados, satelite = simulacion.retornar_resultados()
+    def __init__(
+        self,
+        num_jobs: int,
+        num_machines: int,
+        elementos_por_trabajo: int,
+        rate_mode: str = "Aleatorio",
+        rate_min: float = 1.0,
+        rate_max: float = 5.0,
+        rate_df: pd.DataFrame | None = None,
+    ):
+        self.num_jobs = num_jobs
+        self.num_machines = num_machines
+        self.elementos_por_trabajo = elementos_por_trabajo
+        self.rate_mode = rate_mode
+        self.rate_min = rate_min
+        self.rate_max = rate_max
+        self.rate_df = rate_df
 
-    # Ordenamos experimentos para coincidir con ejemplo
-    for idx, exp in enumerate(experimentos):
-        exp.sort()
-        if simulacion.tecnica_reduccion == "variables antitéticas":
-            exp.append(satelite[idx // 2])
+        # Estos se llenan en run()
+        self.rates = None
+        self.makespan = None
+        self.traza = None
+
+    # ---------------------- generación de rates ---------------------- #
+    def _generar_matriz_rates(self) -> pd.DataFrame:
+        """
+        Devuelve una matriz de tamaño (num_jobs x num_machines) con rates(i,j)
+        en unidades u/hr.
+        """
+        if self.rate_mode.lower().startswith("manual") and self.rate_df is not None:
+            # Usar únicamente las primeras filas/columnas según el tamaño actual
+            sub = self.rate_df.iloc[: self.num_jobs, : self.num_machines].copy()
+            # Reemplaza celdas vacías o no numéricas con un valor por defecto (por ejemplo 1.0)
+            sub = sub.apply(pd.to_numeric, errors="coerce").fillna(1.0)
+            return sub
+
+        elif self.rate_mode.lower().startswith("mixto") and self.rate_df is not None:
+            # Toma matriz manual y completa con aleatorios donde falte
+            sub = self.rate_df.iloc[: self.num_jobs, : self.num_machines].copy()
+            sub = sub.apply(pd.to_numeric, errors="coerce")
+            for i in range(self.num_jobs):
+                for k in range(self.num_machines):
+                    if pd.isna(sub.iat[i, k]) or sub.iat[i, k] <= 0:
+                        sub.iat[i, k] = random.uniform(self.rate_min, self.rate_max)
+            return sub
+
         else:
-            exp.append(satelite[idx])
+            # Totalmente aleatoria
+            data = [
+                [
+                    random.uniform(self.rate_min, self.rate_max)
+                    for _ in range(self.num_machines)
+                ]
+                for _ in range(self.num_jobs)
+            ]
+            cols = [f"M{k+1}" for k in range(self.num_machines)]
+            idx = [f"J{j+1}" for j in range(self.num_jobs)]
+            return pd.DataFrame(data, index=idx, columns=cols)
 
-    df = pd.DataFrame(
-        experimentos,
-        columns=[f"Panel {i+1}" for i in range(paneles)] + ["Satelite (xi)"]
+    # ---------------------- simulación greedy ECT -------------------- #
+    def run(self):
+        """
+        Ejecuta la secuenciación Greedy ECT y devuelve:
+        - makespan (float, en horas)
+        - df_traza (DataFrame con la traza completa)
+        - rates (DataFrame con la matriz de rates usada)
+        """
+        rates = self._generar_matriz_rates()
+
+        # Carga acumulada (horas) en cada máquina
+        carga_maquinas = [0.0 for _ in range(self.num_machines)]
+
+        registros = []
+        orden_global = 1
+
+        # Recorremos trabajos y elementos
+        for j in range(self.num_jobs):
+            for e in range(self.elementos_por_trabajo):
+                tiempos_fin = []
+
+                for m in range(self.num_machines):
+                    # Tiempo de proceso de un solo elemento:
+                    rate_ij = rates.iat[j, m]  # u/hr
+                    if rate_ij <= 0:
+                        proc_time = float("inf")
+                    else:
+                        proc_time = 1.0 / rate_ij  # horas por elemento
+
+                    fin_m = carga_maquinas[m] + proc_time
+                    tiempos_fin.append(fin_m)
+
+                # Elegimos la máquina con menor tiempo de terminación
+                mejor_maquina = min(range(self.num_machines), key=lambda mm: tiempos_fin[mm])
+
+                inicio = carga_maquinas[mejor_maquina]
+                fin = tiempos_fin[mejor_maquina]
+                carga_maquinas[mejor_maquina] = fin
+
+                registros.append(
+                    {
+                        "Maquina": mejor_maquina + 1,
+                        "idTrabajo": j + 1,
+                        "idElemento": e + 1,
+                        "HoraInicio": round(inicio, 3),
+                        "HoraFin": round(fin, 3),
+                        "OrdenSecuenciacion": orden_global,
+                    }
+                )
+                orden_global += 1
+
+        makespan = max(carga_maquinas) if carga_maquinas else 0.0
+
+        self.rates = rates
+        self.makespan = makespan
+        self.traza = pd.DataFrame(registros)
+
+        return makespan, self.traza, rates
+
+
+# ==========================================================================
+# ============================= FUNCIONES AUX ==============================
+# ==========================================================================
+
+
+def correr_experimentos(
+    n_simulaciones: int,
+    usar_aleatorio: bool,
+    trabajos_manual: int,
+    maquinas_manual: int,
+    elementos_por_trabajo: int,
+    rate_mode: str,
+    rate_df: pd.DataFrame,
+    carpeta_salida: str,
+):
+    """
+    Corre S simulaciones independientes y devuelve:
+    - lista_makespans
+    - lista_descripciones (líneas tipo 'Sim 01 | Trabajos=..., Máquinas=..., Elem=..., ...')
+    """
+    os.makedirs(carpeta_salida, exist_ok=True)
+
+    makespans = []
+    descripciones = []
+
+    N_TRAB_MIN, N_TRAB_MAX = 20, 30
+    N_MAQ_MIN, N_MAQ_MAX = 3, 5
+
+    for s in range(1, n_simulaciones + 1):
+        if usar_aleatorio:
+            n_jobs = random.randint(N_TRAB_MIN, N_TRAB_MAX)
+            n_machines = random.randint(N_MAQ_MIN, N_MAQ_MAX)
+        else:
+            n_jobs = trabajos_manual
+            n_machines = maquinas_manual
+
+        simulador = JobShopGreedyECT(
+            num_jobs=n_jobs,
+            num_machines=n_machines,
+            elementos_por_trabajo=elementos_por_trabajo,
+            rate_mode=rate_mode,
+            rate_min=1.0,
+            rate_max=5.0,
+            rate_df=rate_df,
+        )
+
+        mk, df_traza, rates = simulador.run()
+        makespans.append(mk)
+
+        # Guarda CSV con la traza
+        nombre = f"Sim_{s:02d}.csv"
+        ruta_csv = os.path.join(carpeta_salida, nombre)
+        df_traza.to_csv(ruta_csv, index=False)
+
+        # Descripción del tipo de rates
+        if rate_mode.lower().startswith("manual"):
+            desc_mode = "Manual (matriz usuario)"
+        elif rate_mode.lower().startswith("mixto"):
+            desc_mode = "Aleatorio (matriz mixta)"
+        else:
+            desc_mode = "Aleatorio (matriz generada)"
+
+        descripciones.append(
+            f"Sim {s:02d} | Trabajos={n_jobs}, Máquinas={n_machines}, "
+            f"Elem={elementos_por_trabajo}, {desc_mode} → Makespan={mk:.3f} h"
+        )
+
+    return makespans, descripciones
+
+
+# ==========================================================================
+# ================================ STREAMLIT UI ============================
+# ==========================================================================
+
+st.title(
+    "Genera 20 simulaciones; heurística Greedy ECT "
+    "(asigna cada elemento a la máquina donde TERMINA antes)"
+)
+
+st.header("Parámetros")
+
+# ----------- Inicialización de session_state para los controles ---------- #
+if "n_trabajos" not in st.session_state:
+    st.session_state["n_trabajos"] = 26
+if "n_maquinas" not in st.session_state:
+    st.session_state["n_maquinas"] = 5
+if "n_elementos" not in st.session_state:
+    st.session_state["n_elementos"] = 10  # puede ser 10, 20, 30
+
+# Matriz de rates máxima (30 trabajos x 5 máquinas)
+MAX_TRABAJOS = 30
+MAX_MAQUINAS = 5
+if "rate_df" not in st.session_state:
+    columnas = [f"M{k+1}" for k in range(MAX_MAQUINAS)]
+    index = [f"J{j+1}" for j in range(MAX_TRABAJOS)]
+    # Valor por defecto 1.0 u/hr
+    st.session_state["rate_df"] = pd.DataFrame(1.0, index=index, columns=columnas)
+
+col_param, col_resultados = st.columns([2, 3])
+
+with col_param:
+    usar_aleatorio = st.checkbox("Usar aleatorio (uniforme en rangos)")
+
+    # Botón para randomizar ahora los parámetros dentro de los rangos
+    if st.button("Randomizar ahora"):
+        st.session_state["n_trabajos"] = random.randint(20, 30)
+        st.session_state["n_maquinas"] = random.randint(3, 5)
+        st.session_state["n_elementos"] = random.choice([10, 20, 30])
+
+    n_trabajos = st.number_input(
+        "N° Trabajos (20–30)",
+        min_value=20,
+        max_value=30,
+        step=1,
+        key="n_trabajos",
     )
-    df.index += 1
 
-    st.table(df)
+    elementos_por_trabajo = st.selectbox(
+        "Elementos por trabajo",
+        options=[10, 20, 30],
+        index=[10, 20, 30].index(st.session_state["n_elementos"]),
+    )
+    st.session_state["n_elementos"] = elementos_por_trabajo
 
-    # Métricas finales
-    st.write(f"**Promedio del tiempo de falla:** {resultados[1]} hs")
-    st.write(f"**Desviación estándar muestral:** {resultados[2]} hs")
-    st.write(f"**Error estándar:** {resultados[3]} hs")
+    n_maquinas = st.number_input(
+        "N° Máquinas (3–5)",
+        min_value=3,
+        max_value=5,
+        step=1,
+        key="n_maquinas",
+    )
+
+    rate_mode = st.selectbox(
+        "Rates (u/hr)",
+        ["Aleatorio", "Manual", "Mixto (manual + aleatorio)"],
+    )
+
+    _modo_seq = st.selectbox(
+        "Modo de secuenciación",
+        ["Greedy ECT"],
+        index=0,
+        disabled=True,
+        help="Se utiliza la heurística Greedy ECT (Earliest Completion Time).",
+    )
+
+    st.markdown(
+        "*En modo manual se usan los valores de la tabla de rates "
+        "(el combo de modo de secuenciación no aplica).*"
+    )
+
+    col_b1, col_b2 = st.columns(2)
+    ejecutar = col_b1.button("▶ Correr 20 simulaciones")
+    limpiar = col_b2.button("Limpiar")
+
+# --------------------- MATRIZ DE RATES (EDITABLE) ------------------------ #
+st.subheader("Matriz de rates (Trabajo × Máquina)")
+st.caption("Edita M1..M5; el simulador usa solo las primeras N máquinas.")
+rate_df_editada = st.data_editor(
+    st.session_state["rate_df"],
+    key="editor_rates",
+    use_container_width=True,
+)
+st.session_state["rate_df"] = rate_df_editada
+
+# -------------------- LÓGICA DE EJECUCIÓN / LIMPIEZA --------------------- #
+CARPETA_SALIDA = os.path.join(os.getcwd(), "ExamenSims")
+
+if limpiar:
+    if "resultados_sim" in st.session_state:
+        del st.session_state["resultados_sim"]
+
+if ejecutar:
+    S = 20
+    makespans, descripciones = correr_experimentos(
+        n_simulaciones=S,
+        usar_aleatorio=usar_aleatorio,
+        trabajos_manual=int(n_trabajos),
+        maquinas_manual=int(n_maquinas),
+        elementos_por_trabajo=int(elementos_por_trabajo),
+        rate_mode=rate_mode,
+        rate_df=st.session_state["rate_df"],
+        carpeta_salida=CARPETA_SALIDA,
+    )
+
+    if makespans:
+        prom = sum(makespans) / len(makespans)
+        mn = min(makespans)
+        mx = max(makespans)
+    else:
+        prom = mn = mx = 0.0
+
+    st.session_state["resultados_sim"] = {
+        "makespans": makespans,
+        "descripciones": descripciones,
+        "promedio": prom,
+        "min": mn,
+        "max": mx,
+        "carpeta": CARPETA_SALIDA,
+        "usar_aleatorio": usar_aleatorio,
+        "rate_mode": rate_mode,
+    }
+
+# -------------------------- MOSTRAR RESULTADOS --------------------------- #
+if "resultados_sim" in st.session_state:
+    res = st.session_state["resultados_sim"]
+    makespans = res["makespans"]
+    descripciones = res["descripciones"]
+
+    with col_resultados:
+        st.subheader("Resultados por simulación")
+
+        for linea in descripciones:
+            st.write(linea)
+
+    st.markdown("---")
+    st.write(
+        f"**{len(makespans)} simulaciones completadas.**  \n"
+        f"**Makespan (horas)** → Prom: {res['promedio']:.3f} | "
+        f"Min: {res['min']:.3f} | Máx: {res['max']:.3f}"
+    )
+    st.write(f"CSVs guardados en: `{res['carpeta']}`")
+
+    st.markdown(
+        """
+✅ **Simulación terminada.** Revisa los CSVs por simulación.  
+🟦 Aleatorio → Trabajos y máquinas se sortearon en los rangos indicados.  
+🟧 Modo manual → edita la matriz de rates (M1..M5).  
+"""
+    )
 
