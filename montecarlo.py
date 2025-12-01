@@ -43,6 +43,10 @@ class MonteCarloIntegral:
         self.muestra_x = None
         self.alturas = None
         self.areas = None
+
+        # valor intermedio (b-a)/n * sum f(x_i)
+        self.estimacion_base = None
+        # valor final con 2/pi
         self.estimacion = None
 
     # ---------------------- definición de f(x) ---------------------- #
@@ -62,10 +66,8 @@ class MonteCarloIntegral:
         """
         1) x_i ~ U(a,b)
         2) f_i = f(x_i)
-        3) Área_i = factor * fxi * (2 / math.pi)
-
-
-        4) Integral ≈ suma de áreas
+        3) Calcular (b-a)/n * sum f(x_i)
+        4) Multiplicar por 2/pi para estimar la integral pedida
         """
 
         if self.n <= 0:
@@ -77,31 +79,42 @@ class MonteCarloIntegral:
         fs = []
         areas = []
 
+        # factor (b-a)/n
         factor = (self.b - self.a) / float(self.n)
 
         for _ in range(self.n):
             xi = random.uniform(self.a, self.b)
             fxi = self._f(xi)
+
+            # Área_i = ((b-a)/n) * f(x_i)
             area_i = factor * fxi
 
             xs.append(xi)
             fs.append(fxi)
             areas.append(area_i)
 
+        # Paso 3: (b-a)/n * sum f(x_i)
+        suma_f = sum(fs)
+        estimacion_base = factor * suma_f
+
+        # Paso 4: integral con factor 2/pi
+        estimacion_final = (2 / math.pi) * estimacion_base
+
         self.muestra_x = xs
         self.alturas = fs
         self.areas = areas
-        self.estimacion = sum(areas)
+        self.estimacion_base = estimacion_base
+        self.estimacion = estimacion_final
 
         df_resultados = pd.DataFrame(
             {
                 "x_i": xs,
                 "f(x_i)": fs,
-                "Área_i": areas,
+                "Área_i = ((b-a)/n)·f(x_i)": areas,
             }
         )
 
-        return self.estimacion, df_resultados
+        return self.estimacion, self.estimacion_base, df_resultados
 
 
 # ==========================================================================
@@ -169,10 +182,11 @@ if limpiar:
 if ejecutar:
     try:
         modelo = MonteCarloIntegral(a=a, b=b, n=int(n), opcion_funcion=opcion_funcion)
-        estimacion, df_resultados = modelo.run()
+        estimacion, estimacion_base, df_resultados = modelo.run()
 
         st.session_state["mc_resultados"] = {
-            "estimacion": estimacion,
+            "estimacion": estimacion,              # con 2/pi
+            "estimacion_base": estimacion_base,    # (b-a)/n * sum f(x_i)
             "df": df_resultados,
             "a": a,
             "b": b,
@@ -207,8 +221,19 @@ if "mc_resultados" in st.session_state:
 """
         )
 
+        # Paso 3: (b-a)/n * sum f(x_i)
+        st.markdown("**Cálculo intermedio:**")
+        st.latex(
+            r"\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
+            + f"{res['estimacion_base']:.6f}"
+        )
+
+        # Paso 4: Integral con factor 2/pi
         st.markdown("**Estimación de la integral:**")
-        st.latex(r"\hat{I} \approx " + f"{res['estimacion']:.6f}")
+        st.latex(
+            r"\hat{I} = \frac{2}{\pi}\cdot\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
+            + f"{res['estimacion']:.6f}"
+        )
 
     st.markdown("---")
     st.subheader("Muestras, alturas y áreas")
