@@ -236,9 +236,9 @@ if "mc_resultados" in st.session_state:
         if estim_final is not None:
             st.markdown("**Estimación de la integral:**")
             st.latex(
-                r"\hat{I} = \frac{2}{\pi}\cdot\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
-                + f"{estim_final:.6f}"
-            )
+    r"\hat{I} = \frac{2}{\pi}\cdot\frac{b-a}{n}\sum_{i=1}^n f(x_i) \approx "
+    + f"{estim_final:.6f}"
+)
 
     st.markdown("---")
     st.subheader("Muestras, alturas y áreas")
