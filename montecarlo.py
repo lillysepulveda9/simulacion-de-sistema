@@ -261,27 +261,49 @@ with col_param:
     limpiar = col_b2.button("Limpiar")
 
 # ==================================================================
-# === MATRIZ DE RATES REFERENCIAL (COMO AL INICIO, SOLO VISUAL) ====
+# === MATRIZ DE RATES (FILAS = N° TRABAJOS, VALORES 5/10/15) =======
 # ==================================================================
 
-# ==================================================================
-# === MATRIZ DE RATES (IGUAL QUE AL INICIO, EDITABLE) ==============
-# ==================================================================
-
-MAX_TRABAJOS = 30
-MAX_MAQUINAS = 5
+MAX_MAQUINAS = 5  # siempre mostramos M1..M5
 
 if "rate_df" not in st.session_state:
+    # primera vez: crear matriz con filas = n_trabajos
     columnas = [f"M{k+1}" for k in range(MAX_MAQUINAS)]
-    index = [f"J{j+1}" for j in range(MAX_TRABAJOS)]
-
-    #MATRIZ INICIAL REALISTA: valores 5, 10 o 15 aleatorios
+    index = [f"J{j+1}" for j in range(int(n_trabajos))]
     data = [
         [random.choice([5, 10, 15]) for _ in range(MAX_MAQUINAS)]
-        for _ in range(MAX_TRABAJOS)
+        for _ in range(int(n_trabajos))
     ]
-
     st.session_state["rate_df"] = pd.DataFrame(data, index=index, columns=columnas)
+else:
+    # si cambia el número de trabajos, ajustamos filas
+    df_actual = st.session_state["rate_df"]
+    columnas = [f"M{k+1}" for k in range(MAX_MAQUINAS)]
+    n_actual = df_actual.shape[0]
+
+    if n_actual != int(n_trabajos):
+        index = [f"J{j+1}" for j in range(int(n_trabajos))]
+        if int(n_trabajos) < n_actual:
+            # recortar
+            nuevo_df = df_actual.iloc[: int(n_trabajos), :].copy()
+            nuevo_df.index = index
+        else:
+            # extender con filas nuevas aleatorias
+            filas_existentes = df_actual.copy()
+            filas_existentes.index = index[:n_actual]
+
+            filas_nuevas = [
+                [random.choice([5, 10, 15]) for _ in range(MAX_MAQUINAS)]
+                for _ in range(int(n_trabajos) - n_actual)
+            ]
+            df_nuevas = pd.DataFrame(
+                filas_nuevas,
+                index=index[n_actual:],
+                columns=columnas,
+            )
+            nuevo_df = pd.concat([filas_existentes, df_nuevas], axis=0)
+
+        st.session_state["rate_df"] = nuevo_df
 
 st.subheader("Matriz de rates (Trabajo × Máquina)")
 st.caption("Edita M1..M5; el simulador usa solo las primeras N máquinas.")
@@ -290,7 +312,6 @@ st.data_editor(
     key="editor_rates",
     use_container_width=True,
 )
-
 
 CARPETA_SALIDA = os.path.join(os.getcwd(), "ExamenSims")
 
