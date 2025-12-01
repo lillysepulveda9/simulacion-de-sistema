@@ -59,7 +59,8 @@ class MonteCarloIntegral:
         """
         1) x_i ~ U(a,b)
         2) f_i = f(x_i)
-        3) Área_i = ((b-a)/n) * f(x_i)
+        3) Área_i = (factor * fxi) * (2/math.pi)
+
         4) Integral ≈ suma de áreas
         """
 
