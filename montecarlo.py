@@ -102,8 +102,10 @@ class JobShopGreedyECT:
                     tiempos_fin.append(carga_maquinas[m] + proc_time)
 
                 if self.sequencing_mode == "Greedy ECT":
-                    mejor_maquina = min(range(self.num_machines),
-                                        key=lambda mm: tiempos_fin[mm])
+                    mejor_maquina = min(
+                        range(self.num_machines),
+                        key=lambda mm: tiempos_fin[mm]
+                    )
                 else:  # FIFO aleatorio
                     mejor_maquina = random.randint(0, self.num_machines - 1)
 
@@ -188,7 +190,6 @@ def correr_experimentos(
 # ================================ STREAMLIT UI ============================
 # ==========================================================================
 
-# 🔵 SOLO CAMBIÉ ESTA LÍNEA
 st.title("20 Simulaciones Estocásticas de un Sistema Job-Shop (Monte Carlo)")
 
 st.header("Parámetros")
@@ -259,6 +260,30 @@ with col_param:
     ejecutar = col_b1.button("▶ Correr 20 simulaciones")
     limpiar = col_b2.button("Limpiar")
 
+# ==================================================================
+# === MATRIZ DE RATES REFERENCIAL (COMO AL INICIO, SOLO VISUAL) ====
+# ==================================================================
+
+# Matriz 30 trabajos × 5 máquinas, editable (no afecta la lógica actual)
+MAX_TRABAJOS = 30
+MAX_MAQUINAS = 5
+if "rate_df" not in st.session_state:
+    columnas = [f"M{k+1}" for k in range(MAX_MAQUINAS)]
+    index = [f"J{j+1}" for j in range(MAX_TRABAJOS)]
+    # Valor referencial 5 u/hr
+    st.session_state["rate_df"] = pd.DataFrame(5.0, index=index, columns=columnas)
+
+st.subheader("Matriz de rates (Trabajo × Máquina)")
+st.caption(
+    "Matriz referencial de rates. La simulación usa los valores definidos en el "
+    "combo 'Rates (u/hr)'; esta tabla es solo ilustrativa/para edición manual."
+)
+st.data_editor(
+    st.session_state["rate_df"],
+    key="editor_rates",
+    use_container_width=True,
+)
+
 CARPETA_SALIDA = os.path.join(os.getcwd(), "ExamenSims")
 
 if limpiar:
@@ -305,5 +330,3 @@ if "resultados_sim" in st.session_state:
         f"Min: {res['min']:.3f} | Máx: {res['max']:.3f}"
     )
     st.write(f"CSVs guardados en: `{res['carpeta']}`")
-
-
