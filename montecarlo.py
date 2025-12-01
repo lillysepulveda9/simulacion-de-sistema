@@ -63,7 +63,7 @@ class JobShopGreedyECT:
         self.rate_min = rate_min
         self.rate_max = rate_max
         self.rate_df = rate_df
-        self.sequencing_mode = sequencing_mode  # <<---- nuevo parámetro
+        self.sequencing_mode = sequencing_mode
 
         # Estos se llenan en run()
         self.rates = None
@@ -79,7 +79,7 @@ class JobShopGreedyECT:
         if self.rate_mode.lower().startswith("manual") and self.rate_df is not None:
             # Usar únicamente las primeras filas/columnas según el tamaño actual
             sub = self.rate_df.iloc[: self.num_jobs, : self.num_machines].copy()
-            # Reemplaza celdas vacías o no numéricas con un valor por defecto (por ejemplo 1.0)
+            # Reemplaza celdas vacías o no numéricas con un valor por defecto
             sub = sub.apply(pd.to_numeric, errors="coerce").fillna(1.0)
             return sub
 
@@ -146,7 +146,6 @@ class JobShopGreedyECT:
                         range(self.num_machines), key=lambda mm: tiempos_fin[mm]
                     )
                 else:  # FIFO aleatorio
-                    # Se elige una máquina al azar (todas con la misma probabilidad)
                     mejor_maquina = random.randint(0, self.num_machines - 1)
 
                 proc_time = tiempos_proc[mejor_maquina]
@@ -194,7 +193,7 @@ def correr_experimentos(
     """
     Corre S simulaciones independientes y devuelve:
     - lista_makespans
-    - lista_descripciones (líneas tipo 'Sim 01 | Trabajos=..., Máquinas=..., Elem=..., ...')
+    - lista_descripciones
     """
     os.makedirs(carpeta_salida, exist_ok=True)
 
@@ -208,14 +207,17 @@ def correr_experimentos(
         if usar_aleatorio:
             n_jobs = random.randint(N_TRAB_MIN, N_TRAB_MAX)
             n_machines = random.randint(N_MAQ_MIN, N_MAQ_MAX)
+            # elementos por trabajo aleatorio: 5, 10 o 15
+            elem = random.choice([5, 10, 15])
         else:
             n_jobs = trabajos_manual
             n_machines = maquinas_manual
+            elem = elementos_por_trabajo  # fijo: 5, 10 o 15
 
         simulador = JobShopGreedyECT(
             num_jobs=n_jobs,
             num_machines=n_machines,
-            elementos_por_trabajo=elementos_por_trabajo,
+            elementos_por_trabajo=elem,
             rate_mode=rate_mode,
             rate_min=1.0,
             rate_max=5.0,
@@ -241,7 +243,7 @@ def correr_experimentos(
 
         descripciones.append(
             f"Sim {s:02d} | Trabajos={n_jobs}, Máquinas={n_machines}, "
-            f"Elem={elementos_por_trabajo}, {desc_mode}, Regla={sequencing_mode} "
+            f"Elem={elem}, {desc_mode}, Regla={sequencing_mode} "
             f"→ Makespan={mk:.3f} h"
         )
 
@@ -265,7 +267,7 @@ if "n_trabajos" not in st.session_state:
 if "n_maquinas" not in st.session_state:
     st.session_state["n_maquinas"] = 5
 if "n_elementos" not in st.session_state:
-    st.session_state["n_elementos"] = 10  # puede ser 10, 20, 30
+    st.session_state["n_elementos"] = 5  # ahora 5, 10 o 15
 
 # Matriz de rates máxima (30 trabajos x 5 máquinas)
 MAX_TRABAJOS = 30
@@ -273,7 +275,6 @@ MAX_MAQUINAS = 5
 if "rate_df" not in st.session_state:
     columnas = [f"M{k+1}" for k in range(MAX_MAQUINAS)]
     index = [f"J{j+1}" for j in range(MAX_TRABAJOS)]
-    # Valor por defecto 1.0 u/hr
     st.session_state["rate_df"] = pd.DataFrame(1.0, index=index, columns=columnas)
 
 col_param, col_resultados = st.columns([2, 3])
@@ -285,7 +286,7 @@ with col_param:
     if st.button("Randomizar ahora"):
         st.session_state["n_trabajos"] = random.randint(20, 30)
         st.session_state["n_maquinas"] = random.randint(3, 5)
-        st.session_state["n_elementos"] = random.choice([10, 20, 30])
+        st.session_state["n_elementos"] = random.choice([5, 10, 15])
 
     n_trabajos = st.number_input(
         "N° Trabajos (20–30)",
@@ -296,9 +297,9 @@ with col_param:
     )
 
     elementos_por_trabajo = st.selectbox(
-        "Elementos por trabajo",
-        options=[10, 20, 30],
-        index=[10, 20, 30].index(st.session_state["n_elementos"]),
+        "Elementos por trabajo (fijo)",
+        options=[5, 10, 15],
+        index=[5, 10, 15].index(st.session_state["n_elementos"]),
     )
     st.session_state["n_elementos"] = elementos_por_trabajo
 
@@ -315,7 +316,6 @@ with col_param:
         ["Aleatorio", "Manual", "Mixto (manual + aleatorio)"],
     )
 
-    # >>> Aquí ya está habilitado el combo con las dos reglas <<<
     modo_seq = st.selectbox(
         "Modo de secuenciación",
         ["Greedy ECT", "FIFO aleatorio"],
@@ -410,8 +410,8 @@ if "resultados_sim" in st.session_state:
     st.markdown(
         """
 **Simulación terminada.** Revisa los CSVs por simulación.  
-Aleatorio → Trabajos y máquinas se sortearon en los rangos indicados.  
-Modo manual → edita la matriz de rates (M1..M5).  
+Aleatorio → Trabajos, máquinas **y elementos (5/10/15)** se sortearon en los rangos indicados.  
+Modo manual → edita la matriz de rates (M1..M5) y elige elementos fijos (5, 10 o 15).  
 Regla de secuenciación seleccionada en el combo (Greedy ECT o FIFO aleatorio).  
 """
     )
